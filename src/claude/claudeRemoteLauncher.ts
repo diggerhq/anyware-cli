@@ -69,10 +69,14 @@ export async function claudeRemoteLauncher(opts: RemoteLauncherOptions): Promise
       processAbortController.abort();
     });
 
-    // NOTE: We don't auto-queue "proceed" anymore.
-    // The pending permission response is consumed in waitForPermission() when needed.
-    // Auto-queuing "proceed" was causing issues with AskUserQuestion where the selection
-    // is sent as user input and "proceed" would race/override it.
+    // If we have a pending permission response (from local mode) and no messages in queue,
+    // queue a "continue" message to trigger Claude to resume.
+    // NOTE: Don't do this if there's already a message in queue - that handles AskUserQuestion
+    // where the user's selection is sent as user_input.
+    if (session.hasPendingPermissionResponse() && session.queue.size() === 0) {
+      console.log('\x1b[90m[remote] Pending permission response detected, queueing "continue" to resume Claude\x1b[0m');
+      session.queue.push('continue');
+    }
 
     // Run remote mode
     console.log('');
@@ -151,10 +155,10 @@ export async function claudeRemoteLauncher(opts: RemoteLauncherOptions): Promise
           return;
         }
 
-        // Clear any stale pending permission response before requesting new permission
-        // This prevents old responses from auto-approving new requests
-        // IMPORTANT: Don't clear fresh responses (race with local->remote switch).
-        session.clearPendingPermissionResponse(30_000);
+        // IMPORTANT: Clear ALL pending permission responses before requesting new permission
+        // This prevents an OLD response from being consumed by the NEW request
+        // (e.g., user approved Bash 20s ago, now Edit is asking - shouldn't auto-approve Edit)
+        session.clearPendingPermissionResponse(0);
 
         // Extra safety: AskUserQuestion should never be auto-answered by a stale queued message
         // (e.g. an old "proceed" sitting in the queue from a previous UI bug).
