@@ -1,4 +1,4 @@
-name: Release CLI
+name: Create GitHub Release
 
 on:
   push:
@@ -9,97 +9,65 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 0.5.5)'
+        description: 'Version to create release for (e.g., 0.7.29)'
         required: true
 
 jobs:
-  check-version:
+  create-release:
     runs-on: ubuntu-latest
-    outputs:
-      should_release: ${{ steps.check.outputs.should_release }}
-      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      - name: Check if version changed
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if release exists
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "should_release=true" >> $GITHUB_OUTPUT
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            exit 0
+          VERSION="${{ steps.version.outputs.version }}"
+          if gh release view "v${VERSION}" > /dev/null 2>&1; then
+            echo "Release v${VERSION} already exists. Skipping."
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
           fi
-
-          # Get current version
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          echo "Current version: $CURRENT_VERSION"
-
-          # Check if this version already exists
-          if gh release view "v${CURRENT_VERSION}" > /dev/null 2>&1; then
-            echo "Release v${CURRENT_VERSION} already exists. Skipping."
-            echo "should_release=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Version doesn't exist yet, trigger release
-          echo "Version v${CURRENT_VERSION} not found in releases. Triggering release..."
-          echo "should_release=true" >> $GITHUB_OUTPUT
-          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-  build-and-publish:
-    needs: check-version
-    if: needs.check-version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Update version if manual dispatch
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          npm version ${{ needs.check-version.outputs.version }} --no-git-tag-version
-
-      - name: Publish to npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub release
+        if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ needs.check-version.outputs.version }}
-          name: v${{ needs.check-version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            Anyware CLI v${{ needs.check-version.outputs.version }}
+            ## Anyware CLI v${{ steps.version.outputs.version }}
 
-            ## Installation
+            ### Installation
             ```bash
             npm install -g @diggerhq/anyware
             ```
 
-            ## Usage
+            ### Usage
             ```bash
             # Login
             anyware login
 
             # Start a session
-            anyware run
+            anyware
 
             # Start in remote mode
-            anyware run --remote
+            anyware --remote
             ```
+
+            ### Links
+            - [npm package](https://www.npmjs.com/package/@diggerhq/anyware)
+            - [Documentation](https://docs.anyware.run)
