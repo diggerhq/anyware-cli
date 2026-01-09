@@ -1,6 +1,6 @@
 {
   "name": "@diggerhq/anyware",
-  "version": "0.7.27",
+  "version": "0.7.28",
   "description": "Anyware CLI - Claude Code with remote control",
   "type": "module",
   "main": "dist/main.js",

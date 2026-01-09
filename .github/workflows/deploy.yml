@@ -29,19 +29,29 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Bump version (patch) and publish
+      - name: Bump version and publish
         run: |
           # Configure git for version bump commit
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Bump patch version and publish
+          # Bump patch version
           npm version patch --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "New version: $NEW_VERSION"
+          
+          # Check if this version already exists on npm
+          if npm view "@diggerhq/anyware@${NEW_VERSION}" version 2>/dev/null; then
+            echo "Version $NEW_VERSION already exists on npm, skipping publish"
+            exit 0
+          fi
+          
+          # Publish to npm
           npm publish --access public
           
           # Commit and push the version bump
           git add package.json package-lock.json
-          git commit -m "chore: bump version [skip ci]"
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
           git push
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
