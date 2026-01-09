@@ -18,10 +18,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "chokidar": "^4.0.0",
     "commander": "^12.1.0",
+    "dotenv": "^8.2.0",
+    "node-fetch": "^3.3.2",
     "open": "^10.1.0",
     "ws": "^8.18.0",
-    "chokidar": "^4.0.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

@@ -1,6 +1,4 @@
-.env
 **/.env.local
-**/.env
 *.db
 node_modules/
 
@@ -10,3 +8,4 @@ dist/
 
 
 .DS_Store
+config.bat
