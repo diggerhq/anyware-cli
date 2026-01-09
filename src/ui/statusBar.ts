@@ -20,6 +20,8 @@ export class StatusBar {
   private connected: boolean = true;
   private started: boolean = false;
   private resizeHandler: (() => void) | null = null;
+  private redrawTimeout: NodeJS.Timeout | null = null;
+  private lastRedrawTime: number = 0;
 
   constructor(opts: StatusBarOptions) {
     this.sessionId = opts.sessionId;
@@ -93,10 +95,33 @@ export class StatusBar {
   }
 
   /**
-   * Force an immediate redraw - call this when you know the terminal is stable
+   * Force a redraw with debouncing - prevents rapid redraws that can interrupt terminal output
+   * Minimum 1 second between redraws
    */
   redraw(): void {
-    this.draw();
+    const now = Date.now();
+    const timeSinceLastRedraw = now - this.lastRedrawTime;
+    const minInterval = 1000; // Minimum 1 second between redraws
+
+    // Clear any pending redraw
+    if (this.redrawTimeout) {
+      clearTimeout(this.redrawTimeout);
+      this.redrawTimeout = null;
+    }
+
+    if (timeSinceLastRedraw >= minInterval) {
+      // Enough time has passed, redraw immediately
+      this.lastRedrawTime = now;
+      this.draw();
+    } else {
+      // Schedule redraw for later
+      const delay = minInterval - timeSinceLastRedraw;
+      this.redrawTimeout = setTimeout(() => {
+        this.lastRedrawTime = Date.now();
+        this.draw();
+        this.redrawTimeout = null;
+      }, delay);
+    }
   }
 
   /**
@@ -105,6 +130,12 @@ export class StatusBar {
   stop(): void {
     if (!this.started) return;
     this.started = false;
+
+    // Clear any pending redraw timeout
+    if (this.redrawTimeout) {
+      clearTimeout(this.redrawTimeout);
+      this.redrawTimeout = null;
+    }
 
     // Remove resize handler
     if (this.resizeHandler) {

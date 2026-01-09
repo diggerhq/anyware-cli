@@ -205,8 +205,8 @@ export async function createSessionScanner(opts: SessionScannerOptions): Promise
     watcher.on('add', scheduleSync);
   }
 
-  // Periodic sync as backup (every 3 seconds)
-  const intervalId = setInterval(scheduleSync, 3000);
+  // Periodic sync as backup (every 5 seconds)
+  const intervalId = setInterval(scheduleSync, 5000);
 
   return {
     cleanup: async () => {
