@@ -232,9 +232,20 @@ export class Session {
   /**
    * Clear any pending permission response (called when new permission request comes in)
    * This prevents stale responses from auto-approving new requests
+   * @param maxAgeMs - Clear responses older than this (0 = clear all)
    */
   clearPendingPermissionResponse(maxAgeMs: number = 30_000): void {
     if (!this.pendingPermissionResponse) return;
+    
+    // If maxAgeMs is 0, always clear (used when new permission request comes in)
+    if (maxAgeMs === 0) {
+      console.log(
+        `\x1b[33m⚠️ Clearing pending permission response for new request: ${this.pendingPermissionResponse.response}\x1b[0m`,
+      );
+      this.pendingPermissionResponse = null;
+      return;
+    }
+    
     const ageMs = Date.now() - this.pendingPermissionResponse.receivedAt;
     if (ageMs > maxAgeMs) {
       console.log(
