@@ -1,0 +1,73 @@
+name: Create GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'package.json'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to create release for (e.g., 0.7.29)'
+        required: true
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if release exists
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if gh release view "v${VERSION}" > /dev/null 2>&1; then
+            echo "Release v${VERSION} already exists. Skipping."
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            ## Anyware CLI v${{ steps.version.outputs.version }}
+
+            ### Installation
+            ```bash
+            npm install -g @diggerhq/anyware
+            ```
+
+            ### Usage
+            ```bash
+            # Login
+            anyware login
+
+            # Start a session
+            anyware
+
+            # Start in remote mode
+            anyware --remote
+            ```
+
+            ### Links
+            - [npm package](https://www.npmjs.com/package/@diggerhq/anyware)
+            - [Documentation](https://docs.anyware.run)
